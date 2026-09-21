@@ -18,7 +18,7 @@ interface TelemetryHUDProps {
   telemetry: TelemetryData;
 }
 
-export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
+const TelemetryHUDComponent: React.FC<TelemetryHUDProps> = ({
   currentSubsystem,
   telemetry
 }) => {
@@ -209,3 +209,5 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
     </aside>
   );
 };
+
+export const TelemetryHUD = React.memo(TelemetryHUDComponent);

@@ -92,41 +92,45 @@ export function App() {
     setViewerSettings((prev) => ({ ...prev, activeCameraPreset: preset }));
   }, []);
 
-  // Real-time physics / thermodynamic loop update
+  // Real-time physics / thermodynamic loop update with throttled React state sync
   useEffect(() => {
     let animationFrameId: number;
     let lastTime = performance.now();
+    let lastReactSync = performance.now();
 
     const updatePhysics = (now: number) => {
       const dt = (now - lastTime) / 1000;
       lastTime = now;
 
-      setTelemetry((prev) => {
-        // Natural thermal dissipation for brakes
-        let newBrakeTemp = prev.brakeTempC;
-        if (prev.brakePedal === 0 && newBrakeTemp > 120) {
-          newBrakeTemp = Math.max(120, newBrakeTemp - dt * 25);
-        }
+      // Update audio engine on every frame without triggering React re-render
+      soundEngine.updateTelemetry(telemetry.rpm, telemetry.throttle, telemetry.brakePedal, telemetry.speedKmh);
 
-        // Suspension oscillation simulator
-        const osc = Math.sin(now * 0.008 * (1 + prev.roadRoughness * 2)) * 6.5 * prev.roadRoughness;
+      // Throttled React state update (~10 times per second instead of 60)
+      if (now - lastReactSync >= 100) {
+        lastReactSync = now;
 
-        // Sound engine telemetry update
-        soundEngine.updateTelemetry(prev.rpm, prev.throttle, prev.brakePedal, prev.speedKmh);
+        setTelemetry((prev) => {
+          let newBrakeTemp = prev.brakeTempC;
+          if (prev.brakePedal === 0 && newBrakeTemp > 120) {
+            newBrakeTemp = Math.max(120, newBrakeTemp - dt * 25);
+          }
 
-        return {
-          ...prev,
-          brakeTempC: newBrakeTemp,
-          suspensionTravelMm: osc,
-        };
-      });
+          const osc = Math.sin(now * 0.008 * (1 + prev.roadRoughness * 2)) * 6.5 * prev.roadRoughness;
+
+          return {
+            ...prev,
+            brakeTempC: newBrakeTemp,
+            suspensionTravelMm: osc,
+          };
+        });
+      }
 
       animationFrameId = requestAnimationFrame(updatePhysics);
     };
 
     animationFrameId = requestAnimationFrame(updatePhysics);
     return () => cancelAnimationFrame(animationFrameId);
-  }, []);
+  }, [telemetry.rpm, telemetry.throttle, telemetry.brakePedal, telemetry.speedKmh]);
 
   return (
     <div className="relative min-h-screen bg-[#07080c] text-white overflow-x-hidden select-none font-sans">

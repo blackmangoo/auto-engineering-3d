@@ -24,7 +24,7 @@ interface NavbarProps {
   fps: number;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
+const NavbarComponent: React.FC<NavbarProps> = ({
   currentSubsystem,
   onSelectSubsystem,
   viewerSettings,
@@ -203,3 +203,5 @@ export const Navbar: React.FC<NavbarProps> = ({
     </header>
   );
 };
+
+export const Navbar = React.memo(NavbarComponent);

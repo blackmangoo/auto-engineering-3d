@@ -27,7 +27,7 @@ interface SectionItem {
   icon: React.ReactNode;
 }
 
-export const ScrollStorySections: React.FC<ScrollStorySectionsProps> = ({
+const ScrollStorySectionsComponent: React.FC<ScrollStorySectionsProps> = ({
   currentSubsystem,
   onSubsystemChange,
   onScrollProgress,
@@ -150,27 +150,35 @@ export const ScrollStorySections: React.FC<ScrollStorySectionsProps> = ({
   ];
 
   useEffect(() => {
+    let ticking = false;
+
     const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-      const progress = Math.max(0, Math.min(1, scrollY / (docHeight || 1)));
-      onScrollProgress(progress);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const scrollY = window.scrollY;
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const progress = Math.max(0, Math.min(1, scrollY / (docHeight || 1)));
+          onScrollProgress(progress);
 
-      // Section detection based on scroll position
-      const sectionElements = sections.map((s) => document.getElementById(`section-${s.id}`));
-      let activeSys: SubsystemType = 'overview';
+          // Section detection based on scroll position
+          const sectionElements = sections.map((s) => document.getElementById(`section-${s.id}`));
+          let activeSys: SubsystemType = 'overview';
 
-      sectionElements.forEach((el, idx) => {
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (rect.top <= window.innerHeight * 0.5 && rect.bottom >= window.innerHeight * 0.2) {
-            activeSys = sections[idx].id;
+          sectionElements.forEach((el, idx) => {
+            if (el) {
+              const rect = el.getBoundingClientRect();
+              if (rect.top <= window.innerHeight * 0.5 && rect.bottom >= window.innerHeight * 0.2) {
+                activeSys = sections[idx].id;
+              }
+            }
+          });
+
+          if (activeSys !== currentSubsystem) {
+            onSubsystemChange(activeSys);
           }
-        }
-      });
-
-      if (activeSys !== currentSubsystem) {
-        onSubsystemChange(activeSys);
+          ticking = false;
+        });
+        ticking = true;
       }
     };
 
@@ -237,3 +245,5 @@ export const ScrollStorySections: React.FC<ScrollStorySectionsProps> = ({
     </div>
   );
 };
+
+export const ScrollStorySections = React.memo(ScrollStorySectionsComponent);

@@ -17,7 +17,7 @@ export function WindTunnelParticles({
   speedKmh = 120,
 }: WindTunnelParticlesProps) {
   const pointsRef = useRef<THREE.Points>(null);
-  const count = 1200;
+  const count = 220;
 
   // Generate streamlines aligned along the car's Z axis (-6 to +6)
   const [positions, initialPositions, colors, speeds] = useMemo(() => {

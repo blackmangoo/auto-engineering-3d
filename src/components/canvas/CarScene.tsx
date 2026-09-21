@@ -105,37 +105,43 @@ function FpsTracker({ onFpsUpdate }: { onFpsUpdate?: (fps: number) => void }) {
   return null;
 }
 
-// Holographic Floor Grid with Cyberpunk / CAD Rings
+// Holographic Floor Grid with Cyberpunk / CAD Rings & Fast Contact Shadow
 function TechnicalFloor() {
   return (
     <group position={[0, -0.01, 0]}>
-      {/* Floor Shadow Receiver */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      {/* Base Floor Plane */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial
-          color={0x07080c}
-          roughness={0.9}
-          metalness={0.2}
+        <meshBasicMaterial color={0x07080c} />
+      </mesh>
+
+      {/* Lightweight Vehicle Contact Shadow */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <planeGeometry args={[2.2, 4.6]} />
+        <meshBasicMaterial
+          color={0x000000}
+          transparent
+          opacity={0.6}
         />
       </mesh>
 
       {/* Primary CAD Grid */}
       <gridHelper
-        args={[30, 60, 0x00e5ff, 0x151f30]}
+        args={[30, 40, 0x00e5ff, 0x151f30]}
         position={[0, 0.005, 0]}
       />
 
       {/* Concentric Telemetry Target Rings */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[2.8, 2.84, 64]} />
+        <ringGeometry args={[2.8, 2.84, 36]} />
         <meshBasicMaterial color={0x00e5ff} transparent opacity={0.35} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[4.5, 4.53, 64]} />
+        <ringGeometry args={[4.5, 4.53, 36]} />
         <meshBasicMaterial color={0x3b82f6} transparent opacity={0.25} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]}>
-        <ringGeometry args={[6.2, 6.22, 64]} />
+        <ringGeometry args={[6.2, 6.22, 36]} />
         <meshBasicMaterial color={0xff5e1a} transparent opacity={0.2} />
       </mesh>
     </group>
@@ -152,62 +158,38 @@ export const CarScene: React.FC<CarSceneProps> = ({
   return (
     <div className="absolute inset-0 w-full h-full pointer-events-auto bg-[#07080c]">
       <Canvas
-        shadows
+        dpr={1}
         gl={{
           antialias: true,
           powerPreference: 'high-performance',
-          alpha: false
+          alpha: false,
+          stencil: false,
+          depth: true
         }}
       >
         <PerspectiveCamera makeDefault position={[4.8, 2.2, 5.2]} fov={42} />
 
-        {/* Ambient & Directional Key Lighting */}
-        <ambientLight intensity={0.45} />
+        {/* Ambient & Studio Directional Lighting */}
+        <ambientLight intensity={0.7} />
 
         {/* Main Overhead Key Light */}
         <directionalLight
-          position={[6, 12, 6]}
-          intensity={1.8}
-          castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-          shadow-camera-near={0.5}
-          shadow-camera-far={30}
-          shadow-camera-left={-6}
-          shadow-camera-right={6}
-          shadow-camera-top={6}
-          shadow-camera-bottom={-6}
-          shadow-bias={-0.0003}
+          position={[6, 10, 6]}
+          intensity={1.5}
         />
 
         {/* Rim Light (Cyan tint from rear/top) */}
         <directionalLight
           position={[-6, 8, -6]}
-          intensity={1.2}
+          intensity={1.0}
           color={0x00e5ff}
         />
 
         {/* Front Warm Accent Fill */}
         <directionalLight
-          position={[0, 3, -8]}
-          intensity={0.8}
-          color={0xffaa55}
-        />
-
-        {/* Underbody Neon Ground Glow */}
-        <pointLight
-          position={[0, 0.15, 0]}
-          intensity={2.5}
-          distance={4.5}
-          color={0x00e5ff}
-        />
-
-        {/* Underbody Engine Accent Glow */}
-        <pointLight
-          position={[0, 0.4, 0.4]}
-          intensity={telemetry.throttle * 3.5}
-          distance={3.0}
-          color={0xff5e1a}
+          position={[0, 4, -8]}
+          intensity={0.7}
+          color={0xffbb77}
         />
 
         {/* Technical Floor */}
