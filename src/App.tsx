@@ -1,186 +1,68 @@
-import { useState, useEffect, useCallback } from 'react';
-import { CarScene } from './components/canvas/CarScene';
-import { Navbar } from './components/ui/Navbar';
-import { TelemetryHUD } from './components/ui/TelemetryHUD';
-import { SystemDetailCard } from './components/ui/SystemDetailCard';
-import { InteractiveControls } from './components/ui/InteractiveControls';
-import { ScrollStorySections } from './components/ui/ScrollStorySections';
-import type {
-  SubsystemType,
-  TelemetryData,
-  ViewerSettings,
-  CameraPreset
-} from './types/automotive';
-import { soundEngine } from './utils/soundEngine';
+import { useState, useCallback } from 'react';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
+import { FerrariMasterScene } from '@/three/FerrariMasterScene';
+import { FerrariNavbar } from '@/ui/FerrariNavbar';
+import { FerrariStorySections } from '@/ui/FerrariStorySections';
+import { FerrariBottomBar } from '@/ui/FerrariBottomBar';
+import { useFerrariStore } from '@/state/useFerrariStore';
 
-export function App() {
-  // Active engineering subsystem being inspected
-  const [currentSubsystem, setCurrentSubsystem] = useState<SubsystemType>('overview');
-
-  // Overall scroll progression (0.0 to 1.0)
-  const [scrollProgress, setScrollProgress] = useState<number>(0);
-
-  // FPS readout from Three.js render loop
-  const [fps, setFps] = useState<number>(60);
-
-  // Comprehensive vehicle dynamics & telemetry state
-  const [telemetry, setTelemetry] = useState<TelemetryData>({
-    rpm: 2400,
-    gear: 3,
-    speedKmh: 110,
-    engineTempC: 92,
-    oilPressureBar: 5.8,
-    turboBoostBar: 1.45,
-    coolantTempC: 88,
-    brakeTempC: 180,
-    brakePressurePsi: 0,
-    suspensionTravelMm: 4.2,
-    suspensionVelocityMps: 0.12,
-    hvacHighSidePsi: 235,
-    hvacLowSidePsi: 32,
-    cabinTempC: 21.5,
-    ambientTempC: 32.0,
-    throttle: 0.25,
-    brakePedal: 0,
-    clutchEngagement: 0.98,
-    steeringAngleDeg: 0,
-    roadRoughness: 0.35,
-    gForceLat: 0.42,
-    gForceLong: 0.65,
-  });
-
-  // 3D Visualizer settings
-  const [viewerSettings, setViewerSettings] = useState<ViewerSettings>({
-    explodedDistance: 0,
-    xRayMode: false,
-    wireframe: false,
-    showAeroStreamlines: true,
-    autoRotate: false,
-    soundEnabled: false,
-    selectedSubsystem: 'overview',
-    activeCameraPreset: 'default',
-  });
-
-  // Partial update helper for telemetry
-  const handleUpdateTelemetry = useCallback((partial: Partial<TelemetryData>) => {
-    setTelemetry((prev) => ({ ...prev, ...partial }));
-  }, []);
-
-  // Partial update helper for viewer settings
-  const handleUpdateViewerSettings = useCallback((partial: Partial<ViewerSettings>) => {
-    setViewerSettings((prev) => {
-      const next = { ...prev, ...partial };
-      // Handle sound toggle
-      if (partial.soundEnabled !== undefined) {
-        soundEngine.setEnabled(partial.soundEnabled);
+// In-canvas viewport sync to ensure 100% full-bleed resolution across all browser resize events
+function CanvasResizeBridge() {
+  const { gl, camera } = useThree();
+  useFrame(() => {
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if (w > 0 && h > 0 && (gl.domElement.width !== w || gl.domElement.height !== h)) {
+      gl.setSize(w, h);
+      if (camera instanceof THREE.PerspectiveCamera) {
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
       }
-      return next;
-    });
-  }, []);
-
-  // Subsystem selection handler (also scrolls smoothly to section if clicked from navbar)
-  const handleSelectSubsystem = useCallback((id: SubsystemType) => {
-    setCurrentSubsystem(id);
-    const targetElement = document.getElementById(`section-${id}`);
-    if (targetElement) {
-      targetElement.scrollIntoView({ behavior: 'smooth' });
     }
+  });
+  return null;
+}
+
+export default function App() {
+  const [scrollProgress, setScrollProgress] = useState<number>(0);
+  const setLoaded = useFerrariStore((s) => s.setLoaded);
+
+  const handleScrollProgress = useCallback((progress: number) => {
+    setScrollProgress(progress);
   }, []);
-
-  // Camera preset handler
-  const handleSelectCameraPreset = useCallback((preset: CameraPreset) => {
-    setViewerSettings((prev) => ({ ...prev, activeCameraPreset: preset }));
-  }, []);
-
-  // Real-time physics / thermodynamic loop update with throttled React state sync
-  useEffect(() => {
-    let animationFrameId: number;
-    let lastTime = performance.now();
-    let lastReactSync = performance.now();
-
-    const updatePhysics = (now: number) => {
-      const dt = (now - lastTime) / 1000;
-      lastTime = now;
-
-      // Update audio engine on every frame without triggering React re-render
-      soundEngine.updateTelemetry(telemetry.rpm, telemetry.throttle, telemetry.brakePedal, telemetry.speedKmh);
-
-      // Throttled React state update (~10 times per second instead of 60)
-      if (now - lastReactSync >= 100) {
-        lastReactSync = now;
-
-        setTelemetry((prev) => {
-          let newBrakeTemp = prev.brakeTempC;
-          if (prev.brakePedal === 0 && newBrakeTemp > 120) {
-            newBrakeTemp = Math.max(120, newBrakeTemp - dt * 25);
-          }
-
-          const osc = Math.sin(now * 0.008 * (1 + prev.roadRoughness * 2)) * 6.5 * prev.roadRoughness;
-
-          return {
-            ...prev,
-            brakeTempC: newBrakeTemp,
-            suspensionTravelMm: osc,
-          };
-        });
-      }
-
-      animationFrameId = requestAnimationFrame(updatePhysics);
-    };
-
-    animationFrameId = requestAnimationFrame(updatePhysics);
-    return () => cancelAnimationFrame(animationFrameId);
-  }, [telemetry.rpm, telemetry.throttle, telemetry.brakePedal, telemetry.speedKmh]);
 
   return (
-    <div className="relative min-h-screen bg-[#07080c] text-white overflow-x-hidden select-none font-sans">
-      {/* 1. 3D WebGL Canvas Layer (Fixed full-screen backdrop) */}
-      <div className="fixed inset-0 z-0 pointer-events-auto">
-        <CarScene
-          currentSubsystem={currentSubsystem}
-          telemetry={telemetry}
-          viewerSettings={viewerSettings}
-          scrollProgress={scrollProgress}
-          onFpsUpdate={setFps}
-        />
+    <div className="relative min-h-screen bg-[#070709] text-[#f2f2f2] font-sans overflow-x-hidden selection:bg-[#d91424] selection:text-white">
+      {/* ── 1. FIXED WEBGL 3D VIEWPORT (Full-Bleed, Unobstructed Canvas) ─────── */}
+      <div className="canvas-layer" style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', zIndex: 0 }}>
+        <Canvas
+          shadows
+          dpr={1}
+          style={{ width: '100vw', height: '100vh', display: 'block' }}
+          gl={{
+            antialias: true,
+            alpha: false,
+            stencil: false,
+            depth: true,
+            powerPreference: 'high-performance',
+          }}
+          camera={{ position: [4.2, 1.6, 4.4], fov: 35, near: 0.1, far: 100 }}
+          onCreated={() => setLoaded(true)}
+        >
+          <CanvasResizeBridge />
+          <FerrariMasterScene scrollProgress={scrollProgress} />
+        </Canvas>
       </div>
 
-      {/* 2. Top Navigation Bar */}
-      <Navbar
-        currentSubsystem={currentSubsystem}
-        onSelectSubsystem={handleSelectSubsystem}
-        viewerSettings={viewerSettings}
-        onUpdateViewerSettings={handleUpdateViewerSettings}
-        fps={fps}
-      />
+      {/* ── 2. FERRARI LUXURY EDITORIAL TOP NAVIGATION ───────────────────────── */}
+      <FerrariNavbar />
 
-      {/* 3. Live Telemetry HUD (Right side) */}
-      <TelemetryHUD
-        currentSubsystem={currentSubsystem}
-        telemetry={telemetry}
-      />
+      {/* ── 3. NON-BLOCKING EDITORIAL STORYTELLING TRACKS ─────────────────────── */}
+      <FerrariStorySections onScrollProgress={handleScrollProgress} />
 
-      {/* 4. Active Subsystem Technical Deep Dive Card (Left side) */}
-      <SystemDetailCard currentSubsystem={currentSubsystem} />
-
-      {/* 5. Bottom Interactive Engineering Controls Deck */}
-      <InteractiveControls
-        currentSubsystem={currentSubsystem}
-        telemetry={telemetry}
-        onUpdateTelemetry={handleUpdateTelemetry}
-        viewerSettings={viewerSettings}
-        onUpdateViewerSettings={handleUpdateViewerSettings}
-        onSelectCameraPreset={handleSelectCameraPreset}
-      />
-
-      {/* 6. Scroll-Driven Storytelling Sections (Foreground Scroll Content) */}
-      <ScrollStorySections
-        currentSubsystem={currentSubsystem}
-        onSubsystemChange={setCurrentSubsystem}
-        onScrollProgress={setScrollProgress}
-      />
+      {/* ── 4. FLOATING BOTTOM CONTROL DOCK & QUICK COLOR SWATCHES ───────────── */}
+      <FerrariBottomBar />
     </div>
   );
 }
-
-export default App;
